@@ -9,6 +9,7 @@ import pytest
 from mcp_curate.curation.engine import curate
 from mcp_curate.eval.harness import (
     EvalCase,
+    _args_match,
     _curated_index,
     _raw_index,
     load_cases,
@@ -111,6 +112,50 @@ def test_skips_unknown_operation_ids():
     report = run_eval(spec, cases, ScriptedClient({}, {}))
     assert report.total == 0
     assert report.skipped == ["doesNotExist"]
+
+
+def test_args_match_coerces_and_flattens():
+    assert _args_match({"petId": 42}, {"petId": 42})
+    assert _args_match({"petId": 42}, {"petId": "42"})  # string/int coercion
+    assert not _args_match({"petId": 42}, {"petId": 7})
+    assert not _args_match({"petId": 42}, {})  # missing key
+    assert _args_match({"name": "x"}, {"body": {"name": "x"}})  # nested body
+
+
+class ArgClient:
+    """Returns correct tool + action and either correct or wrong arguments."""
+
+    def __init__(self, raw_map, cur_map, arg_map, good=True):
+        self.raw_map, self.cur_map, self.arg_map, self.good = raw_map, cur_map, arg_map, good
+
+    def select(self, request, tools):
+        args = dict(self.arg_map.get(request, {})) if self.good else {"petId": -1}
+        if tools and tools[0].is_meta:
+            name, action = self.cur_map[request]
+            return ToolPick(name=name, arguments={"action": action, "arguments": args})
+        return ToolPick(name=self.raw_map[request], arguments=args)
+
+    def complete(self, prompt):  # pragma: no cover
+        return ""
+
+
+def test_argument_accuracy_scored_over_cases_with_expected_args():
+    spec = load_spec(PETSTORE)
+    cases = load_cases(CASES)
+    raw_map, cur_map = _expectations(spec, cases)
+    arg_map = {c.request: c.arguments for c in cases if c.arguments}
+    assert arg_map  # the golden set declares some expected args
+
+    good = run_eval(spec, cases, ArgClient(raw_map, cur_map, arg_map, good=True))
+    assert good.raw_arg_accuracy == 100.0
+    assert good.curated_arg_accuracy == 100.0
+    assert "argument construction" in good.render()
+
+    bad = run_eval(spec, cases, ArgClient(raw_map, cur_map, arg_map, good=False))
+    assert bad.raw_arg_accuracy == 0.0
+    assert bad.curated_arg_accuracy == 0.0
+    # Tool selection still perfect even when args are wrong.
+    assert bad.raw_accuracy == 100.0
 
 
 def test_anthropic_client_requires_key(monkeypatch):

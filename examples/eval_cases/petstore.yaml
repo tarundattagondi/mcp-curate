@@ -11,23 +11,33 @@ cases:
     operation: findPetsByStatus
   - request: "Look up a single pet using its ID number 42"
     operation: getPetById
+    arguments:
+      petId: 42
   - request: "Remove pet number 7 from the store for good"
     operation: deletePet
+    arguments:
+      petId: 7
   - request: "Find pets tagged as 'cute' and 'friendly'"
     operation: findPetsByTags
   - request: "How many pets do we have in inventory grouped by status?"
     operation: getInventory
   - request: "Place an order to purchase a pet"
     operation: placeOrder
-  - request: "Look up an existing purchase order by its id"
+  - request: "Look up an existing purchase order with id 5"
     operation: getOrderById
+    arguments:
+      orderId: 5
   - request: "Cancel order number 10"
     operation: deleteOrder
+    arguments:
+      orderId: 10
   - request: "Register a new user account for me"
     operation: createUser
   - request: "Log this user into the system with their credentials"
     operation: loginUser
   - request: "Fetch the profile for the user whose username is alice"
     operation: getUserByName
+    arguments:
+      username: alice
   - request: "Change the email and name on an existing user account"
     operation: updateUser

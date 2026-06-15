@@ -11,7 +11,12 @@ from mcp.client.stdio import stdio_client
 from mcp_curate.curation.budget import enforce_budget
 from mcp_curate.curation.describer import DeterministicDescriber, render_action_list
 from mcp_curate.curation.engine import curate
-from mcp_curate.curation.grouper import Group, group_endpoints
+from mcp_curate.curation.grouper import (
+    Group,
+    dominant_segment,
+    group_endpoints,
+    split_to_budget,
+)
 from mcp_curate.parser.loader import load_spec
 from mcp_curate.parser.model import Endpoint
 from mcp_curate.server.builder import ACTION_KEY, build_meta_tool, meta_actions
@@ -30,6 +35,65 @@ def _fake_groups(sizes: dict[str, int]) -> list[Group]:
         ]
         groups.append(Group(key=key, title=key, endpoints=eps, source_tags=[key]))
     return groups
+
+
+def _group_with_paths(key: str, paths: list[str]) -> Group:
+    eps = [
+        Endpoint(operation_id=f"{key}_{i}", method="get", path=p, tags=[key])
+        for i, p in enumerate(paths)
+    ]
+    return Group(key=key, title=key, endpoints=eps, source_tags=[key])
+
+
+def test_split_to_budget_splits_oversized_with_headroom():
+    group = _group_with_paths(
+        "repos",
+        [f"/repos/{{o}}/branches/{i}" for i in range(4)]
+        + [f"/repos/{{o}}/commits/{i}" for i in range(4)],
+    )
+    out = split_to_budget([group], max_actions=3, max_tools=10)
+    assert len(out) > 1
+    keys = {g.key for g in out}
+    assert any(k.startswith("repos_branches") for k in keys)
+    assert any(k.startswith("repos_commits") for k in keys)
+
+
+def test_split_to_budget_respects_tool_budget():
+    group = _group_with_paths(
+        "repos",
+        [f"/repos/{{o}}/branches/{i}" for i in range(4)]
+        + [f"/repos/{{o}}/commits/{i}" for i in range(4)],
+    )
+    # No headroom: already at budget, must not split.
+    out = split_to_budget([group], max_actions=3, max_tools=1)
+    assert len(out) == 1
+
+
+def test_dominant_segment():
+    g = _group_with_paths("x", ["/repos/a", "/repos/b", "/other/c"])
+    assert dominant_segment(g) == "repos"
+
+
+def test_enforce_budget_folds_small_group_into_related():
+    big = _group_with_paths("repos", [f"/repos/{i}" for i in range(5)])
+    sibling = _group_with_paths("reposExtra", ["/repos/extra"])  # shares /repos
+    other = _group_with_paths("users", [f"/users/{i}" for i in range(3)])
+    out, merges = enforce_budget([big, sibling, other], max_tools=2)
+    assert len(out) == 2
+    # users stays intact; the small repos sibling is folded into repos.
+    users = next(g for g in out if g.key == "users")
+    assert users.size == 3
+    repos_group = next(g for g in out if g.key != "users")
+    assert {"repos", "reposExtra"} <= set(repos_group.source_tags)
+    assert merges
+
+
+def test_curate_low_max_actions_splits_petstore():
+    spec = load_spec(PETSTORE)
+    result = curate(spec, max_tools=40, max_actions=3)
+    names = {t.name for t in result.curated_tools}
+    assert len(names) > 3  # pet (8 ops) got split
+    assert any(n.startswith("pet_") for n in names)
 
 
 def test_group_endpoints_by_tag():

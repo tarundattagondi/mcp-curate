@@ -8,10 +8,11 @@ from ..parser.model import Spec
 from ..server.builder import Tool, build_meta_tool, build_raw_tools, meta_actions
 from .budget import enforce_budget
 from .describer import Describer, DeterministicDescriber, render_description
-from .grouper import group_endpoints
+from .grouper import group_endpoints, split_to_budget
 from .report import CurationReport, ToolSummary
 
 DEFAULT_MAX_TOOLS = 40
+DEFAULT_MAX_ACTIONS = 30
 
 
 @dataclass
@@ -24,14 +25,25 @@ class CurationResult:
 def curate(
     spec: Spec,
     max_tools: int = DEFAULT_MAX_TOOLS,
+    max_actions: int = DEFAULT_MAX_ACTIONS,
     describer: Describer | None = None,
 ) -> CurationResult:
-    """Consolidate a spec's endpoints into a curated, budget-bounded tool set."""
+    """Consolidate a spec's endpoints into a curated, budget-bounded tool set.
+
+    Pipeline: group by tag -> merge smallest related groups to fit the tool
+    budget -> split oversized groups into focused sub-tools using whatever
+    headroom is left under ``max_tools`` -> describe and build meta-tools.
+
+    Merging first (not splitting first) means a tight budget keeps tools clean
+    instead of forcing unrelated tags together; splitting then only happens when
+    there is room for it.
+    """
     describer = describer or DeterministicDescriber()
     raw_tools = build_raw_tools(spec)
 
     groups = group_endpoints(spec)
     groups, merges = enforce_budget(groups, max_tools)
+    groups = split_to_budget(groups, max_actions, max_tools)
 
     curated: list[Tool] = []
     summaries: list[ToolSummary] = []

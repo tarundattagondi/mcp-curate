@@ -11,7 +11,7 @@ import asyncio
 import sys
 
 from .curation.describer import DeterministicDescriber, LLMDescriber
-from .curation.engine import DEFAULT_MAX_TOOLS, curate
+from .curation.engine import DEFAULT_MAX_ACTIONS, DEFAULT_MAX_TOOLS, curate
 from .parser.loader import SpecError, load_spec
 from .server.builder import build_raw_tools
 from .server.runtime import ToolServer
@@ -37,6 +37,12 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_MAX_TOOLS,
         help=f"tool budget (default {DEFAULT_MAX_TOOLS})",
     )
+    p_curate.add_argument(
+        "--max-actions",
+        type=int,
+        default=DEFAULT_MAX_ACTIONS,
+        help=f"split tools larger than this many actions (default {DEFAULT_MAX_ACTIONS})",
+    )
 
     p_eval = sub.add_parser(
         "eval", help="A/B raw vs curated tool selection with your LLM key"
@@ -45,6 +51,9 @@ def main(argv: list[str] | None = None) -> int:
     p_eval.add_argument("--cases", required=True, help="golden cases YAML file")
     p_eval.add_argument(
         "--max-tools", type=int, default=DEFAULT_MAX_TOOLS, help="tool budget"
+    )
+    p_eval.add_argument(
+        "--max-actions", type=int, default=DEFAULT_MAX_ACTIONS, help="split threshold"
     )
     p_eval.add_argument("--model", default=None, help="override the LLM model id")
     p_eval.add_argument(
@@ -65,6 +74,12 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=DEFAULT_MAX_TOOLS,
         help=f"tool budget when --curated (default {DEFAULT_MAX_TOOLS})",
+    )
+    p_serve.add_argument(
+        "--max-actions",
+        type=int,
+        default=DEFAULT_MAX_ACTIONS,
+        help=f"split threshold when --curated (default {DEFAULT_MAX_ACTIONS})",
     )
     p_serve.add_argument(
         "--llm-descriptions",
@@ -113,7 +128,7 @@ def _cmd_parse(args: argparse.Namespace) -> int:
 
 def _cmd_curate(args: argparse.Namespace) -> int:
     spec = load_spec(args.spec)
-    result = curate(spec, max_tools=args.max_tools)
+    result = curate(spec, max_tools=args.max_tools, max_actions=args.max_actions)
     print(result.report.render())
     return 0
 
@@ -131,7 +146,12 @@ def _cmd_eval(args: argparse.Namespace) -> int:
         return 2
     describer = LLMDescriber(client) if args.llm_descriptions else DeterministicDescriber()
     report = run_eval(
-        spec, cases, client, max_tools=args.max_tools, describer=describer
+        spec,
+        cases,
+        client,
+        max_tools=args.max_tools,
+        max_actions=args.max_actions,
+        describer=describer,
     )
     print(report.render())
     return 0
@@ -150,7 +170,10 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     if args.curated:
         describer = _build_describer(args)
         tools = curate(
-            spec, max_tools=args.max_tools, describer=describer
+            spec,
+            max_tools=args.max_tools,
+            max_actions=args.max_actions,
+            describer=describer,
         ).curated_tools
         kind = "curated"
     else:

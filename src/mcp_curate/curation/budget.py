@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .grouper import Group, _titleize
+from .grouper import Group, _titleize, dominant_segment
 
 
 @dataclass
@@ -26,7 +26,13 @@ class Merge:
 def enforce_budget(
     groups: list[Group], max_tools: int
 ) -> tuple[list[Group], list[Merge]]:
-    """Merge smallest groups until ``len(groups) <= max_tools``."""
+    """Fold the smallest group into its most related neighbor until under budget.
+
+    Merging the smallest group (rather than two arbitrary groups) keeps large,
+    coherent tags intact. The merge target is chosen by relatedness — a shared
+    leading path segment first, then the next-smallest group — so forced merges
+    stay as sensible as possible.
+    """
     if max_tools < 1:
         raise ValueError("max_tools must be >= 1")
 
@@ -34,11 +40,11 @@ def enforce_budget(
     merges: list[Merge] = []
 
     while len(groups) > max_tools:
-        # Smallest groups last after this sort; pop the two smallest.
         groups.sort(key=lambda g: (-g.size, g.key))
-        smaller = groups.pop()
-        larger = groups.pop()
-        merged = _merge(larger, smaller)
+        smallest = groups.pop()  # last after sort
+        target_idx = _best_target(smallest, groups)
+        target = groups.pop(target_idx)
+        merged = _merge(target, smallest)
         merges.append(
             Merge(
                 result_key=merged.key,
@@ -50,6 +56,17 @@ def enforce_budget(
 
     groups.sort(key=lambda g: (-g.size, g.key))
     return groups, merges
+
+
+def _best_target(group: Group, candidates: list[Group]) -> int:
+    """Index of the most related candidate: shared path segment, else smallest."""
+    seg = dominant_segment(group)
+    related = [
+        i for i, c in enumerate(candidates) if dominant_segment(c) == seg
+    ]
+    pool = related if related else range(len(candidates))
+    # Among the pool, prefer the smallest group to avoid bloating large tags.
+    return min(pool, key=lambda i: (candidates[i].size, candidates[i].key))
 
 
 def _merge(a: Group, b: Group) -> Group:

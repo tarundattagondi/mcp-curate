@@ -18,6 +18,10 @@ class CaseResult:
     curated_action: str | None
     curated_correct: bool
     curated_action_correct: bool
+    # Argument-construction scoring (None when the case declares no expected args).
+    has_expected_args: bool = False
+    raw_arg_correct: bool | None = None
+    curated_arg_correct: bool | None = None
 
 
 @dataclass
@@ -46,6 +50,24 @@ class EvalReport:
     def curated_action_accuracy(self) -> float:
         return self._pct(sum(r.curated_action_correct for r in self.results))
 
+    @property
+    def _arg_cases(self) -> list[CaseResult]:
+        return [r for r in self.results if r.has_expected_args]
+
+    def _arg_pct(self, attr: str) -> float:
+        cases = self._arg_cases
+        if not cases:
+            return 0.0
+        return 100.0 * sum(bool(getattr(r, attr)) for r in cases) / len(cases)
+
+    @property
+    def raw_arg_accuracy(self) -> float:
+        return self._arg_pct("raw_arg_correct")
+
+    @property
+    def curated_arg_accuracy(self) -> float:
+        return self._arg_pct("curated_arg_correct")
+
     def render(self) -> str:
         lines = [
             "Eval: raw vs curated tool selection",
@@ -57,6 +79,15 @@ class EvalReport:
             f"curated correct-tool selection: {self.curated_accuracy:5.0f}%",
             f"  -> improvement: {self.curated_accuracy - self.raw_accuracy:+.0f} points",
             f"curated tool+action correct:    {self.curated_action_accuracy:5.0f}%",
+        ]
+        if self._arg_cases:
+            lines += [
+                "",
+                f"argument construction ({len(self._arg_cases)} cases with expected args):",
+                f"  raw     correct args: {self.raw_arg_accuracy:5.0f}%",
+                f"  curated correct args: {self.curated_arg_accuracy:5.0f}%",
+            ]
+        lines += [
             "",
             "Per-case (request -> raw pick | curated pick.action):",
         ]

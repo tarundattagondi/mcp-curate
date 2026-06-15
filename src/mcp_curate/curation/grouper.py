@@ -44,6 +44,83 @@ def group_endpoints(spec: Spec) -> list[Group]:
     return groups
 
 
+def split_to_budget(
+    groups: list[Group], max_actions: int, max_tools: int
+) -> list[Group]:
+    """Split oversized groups by path sub-segment, within the tool budget.
+
+    A tag like ``repos`` with 200 operations becomes ``repos``,
+    ``repos_actions``, ``repos_pulls`` … — each a focused tool. Splitting only
+    spends the headroom between the current group count and ``max_tools``, and
+    always targets the largest oversized group first, so a tight budget keeps
+    tools clean rather than forcing unrelated merges.
+    """
+    if max_actions < 1:
+        raise ValueError("max_actions must be >= 1")
+    groups = list(groups)
+    while len(groups) < max_tools:
+        groups.sort(key=lambda g: (-g.size, g.key))
+        progressed = False
+        for i, group in enumerate(groups):
+            if group.size <= max_actions:
+                continue
+            pieces = _split_once(group)
+            if len(pieces) > 1 and len(groups) - 1 + len(pieces) <= max_tools:
+                groups.pop(i)
+                groups.extend(pieces)
+                progressed = True
+                break
+        if not progressed:
+            break
+    groups.sort(key=lambda g: (-g.size, g.key))
+    return groups
+
+
+def _split_once(group: Group) -> list[Group]:
+    """Split a group at the shallowest path depth that separates it."""
+    tag = group.source_tags[0] if group.source_tags else group.key
+    max_depth = max(
+        (len(_distinguishing_segments(e.path, tag)) for e in group.endpoints),
+        default=0,
+    )
+    for depth in range(max_depth):
+        buckets: dict[str, list[Endpoint]] = {}
+        for endpoint in group.endpoints:
+            segments = _distinguishing_segments(endpoint.path, tag)
+            sub = segments[depth] if depth < len(segments) else ""
+            buckets.setdefault(sub, []).append(endpoint)
+        if len(buckets) > 1:
+            return [
+                Group(
+                    key=group.key if not sub else f"{group.key}_{sub}",
+                    title=group.title if not sub else f"{group.title} / {sub}",
+                    endpoints=endpoints,
+                    source_tags=list(group.source_tags),
+                )
+                for sub, endpoints in buckets.items()
+            ]
+    return [group]
+
+
+def dominant_segment(group: Group) -> str:
+    """The most common leading path segment across a group's endpoints."""
+    counts: dict[str, int] = {}
+    for endpoint in group.endpoints:
+        segments = [s for s in endpoint.path.split("/") if s and not s.startswith("{")]
+        if segments:
+            counts[segments[0]] = counts.get(segments[0], 0) + 1
+    return max(counts, key=counts.get) if counts else group.key
+
+
+def _distinguishing_segments(path: str, tag: str) -> list[str]:
+    """Non-parameter path segments, with leading tag-matching ones dropped."""
+    segments = [s for s in path.split("/") if s and not s.startswith("{")]
+    i = 0
+    while i < len(segments) and segments[i].lower() == tag.lower():
+        i += 1
+    return segments[i:]
+
+
 def _group_key(endpoint: Endpoint) -> str:
     if endpoint.tags:
         return endpoint.tags[0]
