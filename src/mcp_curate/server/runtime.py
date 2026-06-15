@@ -18,6 +18,7 @@ from mcp.server.stdio import stdio_server
 
 from ..parser.model import Endpoint
 from .builder import ACTION_KEY, ARGS_KEY, BODY_KEY, Tool
+from .safety import UnsafeURLError, assert_safe_url
 
 
 class ToolServer:
@@ -30,12 +31,14 @@ class ToolServer:
         base_url: str = "",
         headers: dict[str, str] | None = None,
         timeout: float = 30.0,
+        allow_local: bool = False,
     ):
         self.name = name
         self.tools = {tool.name: tool for tool in tools}
         self.base_url = base_url.rstrip("/")
         self.headers = headers or {}
         self.timeout = timeout
+        self.allow_local = allow_local
         self._server = Server(name)
         self._register()
 
@@ -73,7 +76,15 @@ class ToolServer:
 
         method, url, query, body, headers = self._build_request(endpoint, call_args)
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            assert_safe_url(url, allow_local=self.allow_local)
+        except UnsafeURLError as exc:
+            return f"blocked: {exc}"
+        try:
+            # follow_redirects stays off: a redirect could bypass the SSRF check
+            # above by sending auth headers to a different (unchecked) host.
+            async with httpx.AsyncClient(
+                timeout=self.timeout, follow_redirects=False
+            ) as client:
                 response = await client.request(
                     method,
                     url,

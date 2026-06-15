@@ -124,6 +124,15 @@ with no API key required).
 4. **Eval** — force the model to pick a tool for each golden request and score
    raw vs curated routing.
 
+## Security
+
+Runs fully local; nothing leaves your machine except LLM calls (eval, with your
+key) and the API calls your served spec makes. An **SSRF guard is on by default**
+— tool calls to loopback/private/link-local hosts are blocked (the cloud-metadata
+address `169.254.169.254` always), so a malicious spec can't exfiltrate your auth
+headers. Use `--allow-local-network` to serve a localhost/private API. See
+[SECURITY.md](SECURITY.md).
+
 ## Development
 
 ```bash

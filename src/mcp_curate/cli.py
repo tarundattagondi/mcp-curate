@@ -90,6 +90,11 @@ def main(argv: list[str] | None = None) -> int:
         "--base-url", default=None, help="override the spec's server URL"
     )
     p_serve.add_argument(
+        "--allow-local-network",
+        action="store_true",
+        help="permit calls to localhost/private hosts (off by default for SSRF safety)",
+    )
+    p_serve.add_argument(
         "--header",
         action="append",
         default=[],
@@ -185,6 +190,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         tools=tools,
         base_url=base_url,
         headers=_parse_headers(args.header),
+        allow_local=args.allow_local_network,
     )
     print(
         f"serving {len(tools)} {kind} tools from {spec.title} over stdio",
