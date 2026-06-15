@@ -12,6 +12,19 @@ from dataclasses import dataclass, field
 
 from ..parser.model import Endpoint, Spec
 
+# Leading path segments that carry no grouping signal (e.g. /v1/, /api/).
+# Stripping them keeps versioned APIs from collapsing into one giant group.
+_VERSION_RE = re.compile(r"^(v\d+|\d+(\.\d+)*|api|rest)$", re.IGNORECASE)
+
+
+def _meaningful_segments(path: str) -> list[str]:
+    """Non-parameter path segments with leading version/api prefixes removed."""
+    segments = [s for s in path.split("/") if s and not s.startswith("{")]
+    i = 0
+    while i < len(segments) and _VERSION_RE.match(segments[i]):
+        i += 1
+    return segments[i:]
+
 
 @dataclass
 class Group:
@@ -103,18 +116,18 @@ def _split_once(group: Group) -> list[Group]:
 
 
 def dominant_segment(group: Group) -> str:
-    """The most common leading path segment across a group's endpoints."""
+    """The most common meaningful leading path segment across a group."""
     counts: dict[str, int] = {}
     for endpoint in group.endpoints:
-        segments = [s for s in endpoint.path.split("/") if s and not s.startswith("{")]
+        segments = _meaningful_segments(endpoint.path)
         if segments:
             counts[segments[0]] = counts.get(segments[0], 0) + 1
     return max(counts, key=counts.get) if counts else group.key
 
 
 def _distinguishing_segments(path: str, tag: str) -> list[str]:
-    """Non-parameter path segments, with leading tag-matching ones dropped."""
-    segments = [s for s in path.split("/") if s and not s.startswith("{")]
+    """Meaningful path segments, with leading tag-matching ones dropped."""
+    segments = _meaningful_segments(path)
     i = 0
     while i < len(segments) and segments[i].lower() == tag.lower():
         i += 1
@@ -124,7 +137,7 @@ def _distinguishing_segments(path: str, tag: str) -> list[str]:
 def _group_key(endpoint: Endpoint) -> str:
     if endpoint.tags:
         return endpoint.tags[0]
-    segments = [s for s in endpoint.path.split("/") if s and not s.startswith("{")]
+    segments = _meaningful_segments(endpoint.path)
     return segments[0] if segments else "default"
 
 

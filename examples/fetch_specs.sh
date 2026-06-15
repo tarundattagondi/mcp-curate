@@ -11,3 +11,6 @@ curl -sL \
   https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json \
   -o github.json
 echo "github.json:   $(wc -c < github.json) bytes"
+
+curl -sL https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json -o stripe.json
+echo "stripe.json:   $(wc -c < stripe.json) bytes"

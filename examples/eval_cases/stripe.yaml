@@ -1,0 +1,30 @@
+# Golden eval cases for the Stripe spec (mid/large, 587 operations).
+# Each case maps a natural-language request to the operationId that should
+# handle it. Run: mcp-curate eval examples/stripe.json --cases examples/eval_cases/stripe.yaml
+cases:
+  - request: "Create a new customer record"
+    operation: PostCustomers
+  - request: "List all of my customers"
+    operation: GetCustomers
+  - request: "Fetch the customer with id cus_123"
+    operation: GetCustomersCustomer
+    arguments:
+      customer: cus_123
+  - request: "Delete the customer cus_456"
+    operation: DeleteCustomersCustomer
+    arguments:
+      customer: cus_456
+  - request: "Charge a credit card"
+    operation: PostCharges
+  - request: "Issue a refund"
+    operation: PostRefunds
+  - request: "Show me the list of invoices"
+    operation: GetInvoices
+  - request: "Start a new payment intent for a checkout"
+    operation: PostPaymentIntents
+  - request: "Create a recurring subscription for a customer"
+    operation: PostSubscriptions
+  - request: "List the available prices"
+    operation: GetPrices
+  - request: "What is my current account balance?"
+    operation: GetBalance

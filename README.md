@@ -13,6 +13,7 @@ right tool, raw vs curated, on *your own* spec.
 | Spec | Raw tools | Curated tools | Reduction |
 |------|----------:|--------------:|----------:|
 | Swagger Petstore | 19 | **3** | 84% |
+| Stripe API | 587 | **40** | 93% |
 | GitHub REST API | 1190 | **40** | 97% |
 
 ```
@@ -54,12 +55,19 @@ the correct tool.
 
 ```
 $ export ANTHROPIC_API_KEY=...
-$ mcp-curate eval examples/petstore.json --cases examples/eval_cases/petstore.yaml
+$ mcp-curate eval examples/stripe.json --cases examples/eval_cases/stripe.yaml
+
+Eval: raw vs curated tool selection
+cases: 11   raw tools: 587   curated tools: 40
+
+raw     correct-tool selection: <run it>%
+curated correct-tool selection: <run it>%
+  -> improvement: <run it> points
 ```
 
-<!-- EVAL_RESULTS: filled from a live run -->
-> **Headline (Petstore, 14 cases):** raw _TBD_% → curated _TBD_% correct-tool
-> selection. _(Run the command above to reproduce; numbers are not hard-coded.)_
+The harness uses **your** key on **your** spec, so the numbers aren't
+hard-coded — run the command above to reproduce them. Golden sets ship for
+Petstore and Stripe (`examples/eval_cases/`); add your own as a small YAML file.
 
 The eval is deliberately honest. Beyond correct-tool selection it also reports:
 
@@ -75,7 +83,7 @@ The eval is deliberately honest. Beyond correct-tool selection it also reports:
 git clone <repo> && cd mcp-curate
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,llm]"
-./examples/fetch_specs.sh        # petstore is committed; this also grabs GitHub
+./examples/fetch_specs.sh        # petstore is committed; this also grabs GitHub + Stripe
 ```
 
 ## Usage
@@ -115,7 +123,7 @@ with no API key required).
 ## Development
 
 ```bash
-python -m pytest        # 34 tests: parser, curation, server roundtrip, eval
+python -m pytest        # 35 tests: parser, curation, server roundtrip, eval
 ```
 
 Tests are offline: the parser/curation suites need no network, and the eval

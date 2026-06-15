@@ -18,7 +18,7 @@ from mcp_curate.curation.grouper import (
     split_to_budget,
 )
 from mcp_curate.parser.loader import load_spec
-from mcp_curate.parser.model import Endpoint
+from mcp_curate.parser.model import Endpoint, Spec
 from mcp_curate.server.builder import ACTION_KEY, build_meta_tool, meta_actions
 from mcp_curate.server.runtime import ToolServer
 
@@ -94,6 +94,18 @@ def test_curate_low_max_actions_splits_petstore():
     names = {t.name for t in result.curated_tools}
     assert len(names) > 3  # pet (8 ops) got split
     assert any(n.startswith("pet_") for n in names)
+
+
+def test_grouping_strips_version_prefix():
+    """Versioned, untagged APIs (e.g. Stripe's /v1/...) must not collapse."""
+    paths = ["/v1/customers", "/v1/customers/{id}", "/v1/charges", "/v1/refunds"]
+    eps = [
+        Endpoint(operation_id=f"op{i}", method="get", path=p)
+        for i, p in enumerate(paths)
+    ]
+    spec = Spec(title="t", version="1", base_url="", endpoints=eps)
+    keys = {g.key for g in group_endpoints(spec)}
+    assert keys == {"customers", "charges", "refunds"}
 
 
 def test_group_endpoints_by_tag():
