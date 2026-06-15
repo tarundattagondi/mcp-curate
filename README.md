@@ -81,10 +81,14 @@ The eval is deliberately honest. Beyond correct-tool selection it also reports:
   expected arguments, whether the model filled the right parameters
   (e.g. `petId: 42` from "look up pet 42").
 
+> **Forking this repo?** The status badges above point to `tarundattagondi/mcp-curate`.
+> Replace that with `your-username/mcp-curate` in the three badge URLs at the top
+> so they track your own fork's CI.
+
 ## Install
 
 ```bash
-git clone <repo> && cd mcp-curate
+git clone https://github.com/tarundattagondi/mcp-curate && cd mcp-curate
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,llm]"
 ./examples/fetch_specs.sh        # petstore is committed; this also grabs GitHub + Stripe
