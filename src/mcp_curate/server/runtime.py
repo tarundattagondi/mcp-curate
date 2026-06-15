@@ -16,7 +16,8 @@ import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
-from .builder import BODY_KEY, Tool
+from ..parser.model import Endpoint
+from .builder import ACTION_KEY, ARGS_KEY, BODY_KEY, Tool
 
 
 class ToolServer:
@@ -59,14 +60,42 @@ class ToolServer:
             return [types.TextContent(type="text", text=result)]
 
     async def _execute(self, tool: Tool, arguments: dict[str, Any]) -> str:
-        endpoint = tool.endpoint
+        if tool.is_meta:
+            action = arguments.get(ACTION_KEY)
+            endpoint = tool.operations.get(action)
+            if endpoint is None:
+                valid = ", ".join(tool.operations)
+                return f"unknown action {action!r}; choose one of: {valid}"
+            call_args = arguments.get(ARGS_KEY, {}) or {}
+        else:
+            endpoint = tool.endpoint
+            call_args = arguments
+
+        method, url, query, body, headers = self._build_request(endpoint, call_args)
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.request(
+                    method,
+                    url,
+                    params=query or None,
+                    json=body if body is not None else None,
+                    headers=headers,
+                )
+            return _format_response(response)
+        except httpx.HTTPError as exc:
+            return f"request failed: {exc}"
+
+    def _build_request(
+        self, endpoint: Endpoint, call_args: dict[str, Any]
+    ) -> tuple[str, str, dict[str, Any], Any, dict[str, str]]:
+        """Map tool arguments onto an HTTP request for one operation."""
         path = endpoint.path
         query: dict[str, Any] = {}
         headers = dict(self.headers)
         body: Any = None
 
         param_locations = {p.name: p.location for p in endpoint.parameters}
-        for key, value in arguments.items():
+        for key, value in call_args.items():
             if key == BODY_KEY:
                 body = value
                 continue
@@ -78,19 +107,7 @@ class ToolServer:
             else:
                 query[key] = value
 
-        url = f"{self.base_url}{path}"
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.request(
-                    endpoint.method.upper(),
-                    url,
-                    params=query or None,
-                    json=body if body is not None else None,
-                    headers=headers,
-                )
-            return _format_response(response)
-        except httpx.HTTPError as exc:
-            return f"request failed: {exc}"
+        return endpoint.method.upper(), f"{self.base_url}{path}", query, body, headers
 
     async def run(self) -> None:
         async with stdio_server() as (read, write):

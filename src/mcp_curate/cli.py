@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import sys
 
+from .curation.engine import DEFAULT_MAX_TOOLS, curate
 from .parser.loader import SpecError, load_spec
 from .server.builder import build_raw_tools
 from .server.runtime import ToolServer
@@ -25,8 +26,30 @@ def main(argv: list[str] | None = None) -> int:
     p_parse = sub.add_parser("parse", help="parse a spec and report tool counts")
     p_parse.add_argument("spec", help="path to an OpenAPI 3.x JSON/YAML file")
 
-    p_serve = sub.add_parser("serve", help="serve the raw MCP server over stdio")
+    p_curate = sub.add_parser(
+        "curate", help="show the before/after curation report for a spec"
+    )
+    p_curate.add_argument("spec", help="path to an OpenAPI 3.x JSON/YAML file")
+    p_curate.add_argument(
+        "--max-tools",
+        type=int,
+        default=DEFAULT_MAX_TOOLS,
+        help=f"tool budget (default {DEFAULT_MAX_TOOLS})",
+    )
+
+    p_serve = sub.add_parser("serve", help="serve an MCP server over stdio")
     p_serve.add_argument("spec", help="path to an OpenAPI 3.x JSON/YAML file")
+    p_serve.add_argument(
+        "--curated",
+        action="store_true",
+        help="serve the curated tool set instead of the raw one",
+    )
+    p_serve.add_argument(
+        "--max-tools",
+        type=int,
+        default=DEFAULT_MAX_TOOLS,
+        help=f"tool budget when --curated (default {DEFAULT_MAX_TOOLS})",
+    )
     p_serve.add_argument(
         "--base-url", default=None, help="override the spec's server URL"
     )
@@ -42,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "parse":
             return _cmd_parse(args)
+        if args.command == "curate":
+            return _cmd_curate(args)
         if args.command == "serve":
             return _cmd_serve(args)
     except SpecError as exc:
@@ -63,9 +88,21 @@ def _cmd_parse(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_curate(args: argparse.Namespace) -> int:
+    spec = load_spec(args.spec)
+    result = curate(spec, max_tools=args.max_tools)
+    print(result.report.render())
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     spec = load_spec(args.spec)
-    tools = build_raw_tools(spec)
+    if args.curated:
+        tools = curate(spec, max_tools=args.max_tools).curated_tools
+        kind = "curated"
+    else:
+        tools = build_raw_tools(spec)
+        kind = "raw"
     base_url = args.base_url if args.base_url is not None else spec.base_url
     server = ToolServer(
         name=spec.title,
@@ -74,7 +111,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         headers=_parse_headers(args.header),
     )
     print(
-        f"serving {len(tools)} raw tools from {spec.title} over stdio",
+        f"serving {len(tools)} {kind} tools from {spec.title} over stdio",
         file=sys.stderr,
     )
     asyncio.run(server.run())

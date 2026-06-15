@@ -22,16 +22,33 @@ _MAX_NAME_LEN = 64
 BODY_KEY = "body"
 
 
+# Meta-tools select among their backing operations with this argument.
+ACTION_KEY = "action"
+ARGS_KEY = "arguments"
+
+
 @dataclass
 class Tool:
-    """An MCP-facing tool backed by one OpenAPI operation (raw mapping)."""
+    """An MCP-facing tool backed by one or more OpenAPI operations.
+
+    Raw tools back a single operation and expose its parameters flatly.
+    Curated meta-tools (Phase 2) back several operations keyed by an
+    ``action`` argument; ``is_meta`` selects how the runtime dispatches.
+    """
 
     name: str
     description: str
     input_schema: dict[str, Any]
-    endpoint: Endpoint
-    # Names this tool consolidates (Phase 2 fills this; raw tools list themselves).
+    # action name -> backing operation. Raw tools use the single key "".
+    operations: dict[str, Endpoint]
+    is_meta: bool = False
+    # operationIds this tool consolidates (for the before/after report).
     members: list[str] = field(default_factory=list)
+
+    @property
+    def endpoint(self) -> Endpoint:
+        """The sole backing operation (raw tools only)."""
+        return next(iter(self.operations.values()))
 
 
 def build_raw_tools(spec: Spec) -> list[Tool]:
@@ -45,7 +62,8 @@ def build_raw_tools(spec: Spec) -> list[Tool]:
                 name=name,
                 description=_raw_description(endpoint),
                 input_schema=build_input_schema(endpoint),
-                endpoint=endpoint,
+                operations={"": endpoint},
+                is_meta=False,
                 members=[endpoint.operation_id],
             )
         )
@@ -79,6 +97,67 @@ def build_input_schema(endpoint: Endpoint) -> dict[str, Any]:
     if required:
         schema["required"] = required
     return schema
+
+
+def meta_actions(endpoints: list[Endpoint], source_tags: list[str]) -> dict[str, Endpoint]:
+    """Map short, unique action names to a group's backing operations.
+
+    The group's tag prefix is stripped from each operationId (it's redundant
+    inside a tool already named for the tag), then names are sanitized and
+    de-duplicated. Order is preserved for stable output.
+    """
+    actions: dict[str, Endpoint] = {}
+    used: set[str] = set()
+    for endpoint in endpoints:
+        base = _strip_tag_prefix(endpoint.operation_id, source_tags)
+        name = _NAME_RE.sub("_", base).strip("_").lower() or "op"
+        name = re.sub(r"_+", "_", name)
+        actions[_unique_name(name, used)] = endpoint
+    return actions
+
+
+def build_meta_tool(
+    name: str, description: str, actions: dict[str, Endpoint]
+) -> Tool:
+    """Assemble a meta-tool whose ``action`` argument selects an operation."""
+    schema = {
+        "type": "object",
+        "properties": {
+            ACTION_KEY: {
+                "type": "string",
+                "enum": list(actions),
+                "description": "the operation to perform (see this tool's description)",
+            },
+            ARGS_KEY: {
+                "type": "object",
+                "description": "parameters for the chosen action",
+                "additionalProperties": True,
+            },
+        },
+        "required": [ACTION_KEY],
+    }
+    return Tool(
+        name=name,
+        description=description,
+        input_schema=schema,
+        operations=dict(actions),
+        is_meta=True,
+        members=[e.operation_id for e in actions.values()],
+    )
+
+
+def _strip_tag_prefix(operation_id: str, source_tags: list[str]) -> str:
+    base = operation_id
+    for tag in source_tags:
+        tag_norm = _NAME_RE.sub("", tag).lower()
+        for sep in ("_", "-", "/", "."):
+            prefix = f"{tag}{sep}"
+            if base.lower().startswith(prefix.lower()):
+                return base[len(prefix):]
+        # Also handle camelCase-ish "tagSomething" -> "Something".
+        if tag_norm and base.lower().startswith(tag_norm) and len(base) > len(tag_norm):
+            return base[len(tag_norm):]
+    return base
 
 
 def _tool_name(endpoint: Endpoint) -> str:
