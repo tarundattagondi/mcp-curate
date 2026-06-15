@@ -1,5 +1,9 @@
 # mcp-curate
 
+[![CI](https://github.com/tarundattagondi/mcp-curate/actions/workflows/ci.yml/badge.svg)](https://github.com/tarundattagondi/mcp-curate/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 **Turn an OpenAPI spec into a *curated* MCP server an LLM can actually use — and prove it with an eval.**
 
 A naive OpenAPI→MCP generator dumps one tool per endpoint. Point it at GitHub's
