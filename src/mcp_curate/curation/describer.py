@@ -67,9 +67,8 @@ class DeterministicDescriber:
 class LLMDescriber:
     """LLM-polished lead sentence and tool name, with a safe fallback."""
 
-    def __init__(self, client, model: str):
+    def __init__(self, client):
         self._client = client
-        self._model = model
         self._fallback = DeterministicDescriber()
 
     def describe(self, group: Group, actions: dict[str, Endpoint]) -> tuple[str, str]:
@@ -85,7 +84,7 @@ class LLMDescriber:
                 "name: <snake_case tool name, <=40 chars>\n"
                 "lead: <one sentence, <=160 chars, says what the tool is for>"
             )
-            text = self._client.complete(prompt, self._model)
+            text = self._client.complete(prompt)
             parsed = _parse_llm_reply(text)
             return parsed.get("name", name), parsed.get("lead", lead)
         except Exception:  # noqa: BLE001 — never let polishing break curation

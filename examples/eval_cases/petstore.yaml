@@ -1,0 +1,33 @@
+# Golden eval cases for the Petstore spec.
+# Each case maps a natural-language request to the operationId that should
+# ultimately handle it. The harness resolves the expected raw tool and the
+# expected curated meta-tool + action from this operationId.
+cases:
+  - request: "I want to add a brand new pet to the store"
+    operation: addPet
+  - request: "Update the details of a pet that already exists"
+    operation: updatePet
+  - request: "Show me all the pets that are currently available"
+    operation: findPetsByStatus
+  - request: "Look up a single pet using its ID number 42"
+    operation: getPetById
+  - request: "Remove pet number 7 from the store for good"
+    operation: deletePet
+  - request: "Find pets tagged as 'cute' and 'friendly'"
+    operation: findPetsByTags
+  - request: "How many pets do we have in inventory grouped by status?"
+    operation: getInventory
+  - request: "Place an order to purchase a pet"
+    operation: placeOrder
+  - request: "Look up an existing purchase order by its id"
+    operation: getOrderById
+  - request: "Cancel order number 10"
+    operation: deleteOrder
+  - request: "Register a new user account for me"
+    operation: createUser
+  - request: "Log this user into the system with their credentials"
+    operation: loginUser
+  - request: "Fetch the profile for the user whose username is alice"
+    operation: getUserByName
+  - request: "Change the email and name on an existing user account"
+    operation: updateUser
