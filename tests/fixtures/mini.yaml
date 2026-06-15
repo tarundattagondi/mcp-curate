@@ -1,0 +1,64 @@
+openapi: 3.0.3
+info:
+  title: Mini API
+  version: 2.1.0
+servers:
+  - url: https://api.example.com/v2
+paths:
+  /widgets:
+    parameters:
+      - name: tenant
+        in: header
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: listWidgets
+      summary: List widgets
+      tags: [widgets]
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: ok
+    post:
+      # no operationId on purpose -> parser must synthesize one
+      summary: Create a widget
+      tags: [widgets]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Widget"
+      responses:
+        "201":
+          description: created
+  /widgets/{id}:
+    get:
+      operationId: getWidget
+      summary: Get a widget
+      tags: [widgets]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+components:
+  schemas:
+    Widget:
+      type: object
+      properties:
+        name:
+          type: string
+        parent:
+          # self-reference: parser must cut the cycle, not loop forever
+          $ref: "#/components/schemas/Widget"
+      required: [name]
