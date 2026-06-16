@@ -1,5 +1,6 @@
 # mcp-curate
 
+[![PyPI](https://img.shields.io/pypi/v/mcp-curate)](https://pypi.org/project/mcp-curate/)
 [![CI](https://github.com/tarundattagondi/mcp-curate/actions/workflows/ci.yml/badge.svg)](https://github.com/tarundattagondi/mcp-curate/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -86,6 +87,13 @@ The eval is deliberately honest. Beyond correct-tool selection it also reports:
 > so they track your own fork's CI.
 
 ## Install
+
+```bash
+pip install mcp-curate        # core CLI
+pip install "mcp-curate[llm]" # + eval harness / --llm-descriptions (Anthropic)
+```
+
+Or from source (for development, or to run the example specs):
 
 ```bash
 git clone https://github.com/tarundattagondi/mcp-curate && cd mcp-curate
