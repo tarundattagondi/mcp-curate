@@ -9,11 +9,32 @@ description = "Turn an OpenAPI spec into a high-quality, curated MCP server — 
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [{ name = "tarundattagondi" }]
+keywords = [
+    "mcp", "model-context-protocol", "openapi", "swagger", "llm",
+    "anthropic", "claude", "tool-calling", "cli", "code-generation",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "mcp>=1.27,<2",
     "pyyaml>=6,<7",
     "httpx>=0.27",
 ]
+
+[project.urls]
+Homepage = "https://github.com/tarundattagondi/mcp-curate"
+Repository = "https://github.com/tarundattagondi/mcp-curate"
+Issues = "https://github.com/tarundattagondi/mcp-curate/issues"
 
 [project.optional-dependencies]
 # Only the eval harness and optional --llm-descriptions need an LLM client.
