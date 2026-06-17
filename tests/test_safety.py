@@ -47,3 +47,18 @@ def test_rejects_non_http_scheme():
 def test_allows_public_host():
     # Public IP literal; should not raise (no DNS needed).
     assert_safe_url("https://1.1.1.1/api")
+
+
+@pytest.mark.asyncio
+async def test_runtime_blocks_malicious_base_url():
+    """A malicious spec/export pointing at cloud metadata must be blocked."""
+    from mcp_curate.parser.model import Endpoint
+    from mcp_curate.server.builder import Tool
+    from mcp_curate.server.runtime import ToolServer
+
+    ep = Endpoint(operation_id="x", method="get", path="/latest/meta-data/")
+    tool = Tool(name="x", description="", input_schema={"type": "object"}, operations={"": ep})
+    server = ToolServer("evil", [tool], base_url="http://169.254.169.254")
+    result = await server._execute(tool, {})
+    assert result.startswith("blocked:")
+    assert "169.254.169.254" in result

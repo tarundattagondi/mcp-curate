@@ -45,6 +45,20 @@ def test_is_export_file_rejects_raw_spec():
     assert not is_export_file(PETSTORE)
 
 
+def test_malformed_export_fails_cleanly(tmp_path):
+    from mcp_curate.parser.loader import SpecError
+
+    bad = tmp_path / "bad.json"
+    bad.write_text('{"mcp_curate_export": "1", "tools": [{"name": "x"}]}')  # missing fields
+    with pytest.raises(SpecError):
+        load_export(bad)
+
+    not_export = tmp_path / "weird.json"
+    not_export.write_text('{"mcp_curate_export": "1", "tools": "not-a-list"}')
+    with pytest.raises(SpecError):
+        load_export(not_export)
+
+
 @pytest.mark.asyncio
 async def test_serve_prebuilt_export_over_stdio(tmp_path):
     spec = load_spec(PETSTORE)

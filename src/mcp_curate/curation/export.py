@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from ..parser.loader import SpecError
 from ..parser.model import Endpoint, Parameter
 from ..server.builder import Tool
 
@@ -39,10 +40,23 @@ def is_export_file(path: str | Path) -> bool:
 
 
 def load_export(path: str | Path) -> tuple[str, str, list[Tool]]:
-    """Reconstruct (title, base_url, tools) from a curate-export file."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    tools = [_tool_from_dict(t) for t in data.get("tools", [])]
-    return data.get("title", "API"), data.get("base_url", ""), tools
+    """Reconstruct (title, base_url, tools) from a curate-export file.
+
+    Raises :class:`SpecError` on a malformed file rather than leaking a raw
+    parsing exception — the file is data, never executed, but it should fail
+    cleanly so a corrupt or hand-edited export can't crash the server.
+    """
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SpecError(f"cannot read export file {path}: {exc}") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("tools"), list):
+        raise SpecError(f"{path} is not a valid mcp-curate export")
+    try:
+        tools = [_tool_from_dict(t) for t in data["tools"]]
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise SpecError(f"malformed tool in export file {path}: {exc}") from exc
+    return str(data.get("title", "API")), str(data.get("base_url", "")), tools
 
 
 def _tool_to_dict(tool: Tool) -> dict:

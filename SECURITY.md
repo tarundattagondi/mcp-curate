@@ -27,6 +27,12 @@ mcp-curate mitigates this:
 - **Local/JSON-only parsing.** Specs are parsed with `yaml.safe_load` (no
   arbitrary object construction) and only local `#/...` `$ref`s are resolved —
   the parser never fetches remote references.
+- **Data-only deserialization.** Spec files and exported tool sets
+  (`curate --export`) are parsed as plain JSON/YAML — never `pickle`, `eval`, or
+  arbitrary object construction. A corrupt or hand-edited export fails with a
+  clean error instead of executing anything. The SSRF guard above applies to a
+  served export exactly as to a spec, so a malicious export's server URL cannot
+  reach an internal/metadata host either.
 - **Path-parameter encoding.** Values substituted into URL paths are
   percent-encoded, preventing path/segment injection.
 - **Request timeouts** are set on every call.
@@ -50,6 +56,10 @@ This permits loopback/private hosts but still blocks the cloud-metadata range.
   calling an API. Review a spec's `servers:` URL before serving it.
 - DNS rebinding is not fully mitigated (addresses are checked at request time,
   not pinned). For untrusted specs, prefer reviewing the host first.
+- A maliciously crafted spec could be very large or deeply nested and exhaust
+  memory/CPU while parsing (a denial-of-service against your own process). The
+  parser caps `$ref` recursion depth and cuts cycles, but does not bound total
+  document size. Don't parse specs you don't trust without resource limits.
 
 ## Reporting
 
