@@ -24,6 +24,7 @@ from ..parser.loader import load_spec
 from ..parser.model import Spec
 from ..server.builder import ACTION_KEY, ARGS_KEY, Tool, build_raw_tools
 from .llm import LLMClient
+from .pricing import Usage
 from .report import CaseResult, EvalReport
 
 
@@ -115,6 +116,8 @@ def run_eval(
 
     results: list[CaseResult] = []
     skipped: list[str] = []
+    raw_usage = Usage()
+    curated_usage = Usage()
     for case in cases:
         if case.operation_id not in raw_idx or case.operation_id not in cur_idx:
             skipped.append(case.operation_id)
@@ -125,6 +128,11 @@ def run_eval(
 
         raw_pick = client.select(case.request, raw_tools)
         cur_pick = client.select(case.request, curated_tools)
+
+        if raw_pick and raw_pick.usage:
+            raw_usage.add(raw_pick.usage)
+        if cur_pick and cur_pick.usage:
+            curated_usage.add(cur_pick.usage)
 
         raw_name = raw_pick.name if raw_pick else None
         cur_name = cur_pick.name if cur_pick else None
@@ -167,4 +175,7 @@ def run_eval(
         skipped=skipped,
         raw_tool_count=len(raw_tools),
         curated_tool_count=len(curated_tools),
+        raw_usage=raw_usage,
+        curated_usage=curated_usage,
+        model=getattr(client, "_model", ""),
     )

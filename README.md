@@ -95,6 +95,10 @@ argument construction (5 cases with expected args):
   curated correct args:   100%
 ```
 
+The eval also reports **measured token usage and cost** straight from the API's
+`usage` field (not estimated) — real input/output tokens and dollar cost for the
+raw vs curated tool set, plus the per-1,000-request saving at your model's price.
+
 Petstore is deliberately tiny (19 tools), so even the raw server does well — yet
 curated still reaches **100%**, fixing the one case where the raw model returned
 *no tool at all*. The gap widens sharply as the API grows: tool-selection

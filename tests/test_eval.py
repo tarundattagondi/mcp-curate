@@ -158,6 +158,48 @@ def test_argument_accuracy_scored_over_cases_with_expected_args():
     assert bad.raw_accuracy == 100.0
 
 
+class UsageClient:
+    """Returns correct picks plus measured usage (raw bigger than curated)."""
+
+    _model = "claude-sonnet-4-6"
+
+    def __init__(self, raw_map, cur_map):
+        self.raw_map, self.cur_map = raw_map, cur_map
+
+    def select(self, request, tools):
+        from mcp_curate.eval.pricing import Usage
+
+        if tools and tools[0].is_meta:
+            name, action = self.cur_map[request]
+            return ToolPick(name, {"action": action},
+                            usage=Usage(input_tokens=1000, output_tokens=20, requests=1))
+        return ToolPick(self.raw_map[request], {},
+                        usage=Usage(input_tokens=20000, output_tokens=20, requests=1))
+
+    def complete(self, prompt):  # pragma: no cover
+        return ""
+
+
+def test_measured_token_and_cost_accounting():
+    spec = load_spec(PETSTORE)
+    cases = load_cases(CASES)
+    raw_map, cur_map = _expectations(spec, cases)
+    report = run_eval(spec, cases, UsageClient(raw_map, cur_map))
+
+    n = report.total
+    assert report.raw_usage.input_tokens == 20000 * n
+    assert report.curated_usage.input_tokens == 1000 * n
+    assert report.model == "claude-sonnet-4-6"
+
+    from mcp_curate.eval.pricing import cost
+    # Sonnet input $3/1M: raw cost must exceed curated cost.
+    assert cost(report.model, report.raw_usage) > cost(report.model, report.curated_usage)
+
+    text = report.render()
+    assert "Measured token usage & cost" in text
+    assert "saved per 1,000 requests" in text
+
+
 def test_anthropic_client_requires_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(RuntimeError):

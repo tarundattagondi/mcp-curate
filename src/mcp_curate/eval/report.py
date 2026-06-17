@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .pricing import Usage, cost
+
 
 @dataclass
 class CaseResult:
@@ -30,6 +32,9 @@ class EvalReport:
     skipped: list[str] = field(default_factory=list)
     raw_tool_count: int = 0
     curated_tool_count: int = 0
+    raw_usage: Usage = field(default_factory=Usage)
+    curated_usage: Usage = field(default_factory=Usage)
+    model: str = ""
 
     @property
     def total(self) -> int:
@@ -68,6 +73,28 @@ class EvalReport:
     def curated_arg_accuracy(self) -> float:
         return self._arg_pct("curated_arg_correct")
 
+    def _token_cost_lines(self) -> list[str]:
+        ru, cu = self.raw_usage, self.curated_usage
+        if not (ru.requests or cu.requests):
+            return []  # no measured usage (e.g. scripted/offline client)
+        raw_cost = cost(self.model, ru)
+        cur_cost = cost(self.model, cu)
+        raw_in = ru.input_tokens + ru.cache_read_tokens + ru.cache_creation_tokens
+        cur_in = cu.input_tokens + cu.cache_read_tokens + cu.cache_creation_tokens
+        saved_pct = 100.0 * (1 - cur_in / raw_in) if raw_in else 0.0
+        per1k = (raw_cost - cur_cost) / self.total * 1000 if self.total else 0.0
+        return [
+            "",
+            f"Measured token usage & cost  (model: {self.model or 'unknown'}, "
+            f"{self.total} requests each side):",
+            f"  raw     input tokens: {raw_in:>10,}   output: {ru.output_tokens:>7,}"
+            f"   cost: ${raw_cost:.4f}",
+            f"  curated input tokens: {cur_in:>10,}   output: {cu.output_tokens:>7,}"
+            f"   cost: ${cur_cost:.4f}",
+            f"  -> input tokens {saved_pct:.0f}% smaller; "
+            f"~${per1k:.2f} saved per 1,000 requests (measured, not estimated)",
+        ]
+
     def render(self) -> str:
         lines = [
             "Eval: raw vs curated tool selection",
@@ -80,6 +107,7 @@ class EvalReport:
             f"  -> improvement: {self.curated_accuracy - self.raw_accuracy:+.0f} points",
             f"curated tool+action correct:    {self.curated_action_accuracy:5.0f}%",
         ]
+        lines += self._token_cost_lines()
         if self._arg_cases:
             lines += [
                 "",

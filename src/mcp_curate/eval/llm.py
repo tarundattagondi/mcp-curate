@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from ..server.builder import Tool
+from .pricing import Usage
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
 
@@ -26,6 +27,7 @@ class ToolPick:
 
     name: str
     arguments: dict[str, Any]
+    usage: Usage | None = None  # measured token usage for this request, if known
 
 
 class LLMClient(Protocol):
@@ -36,6 +38,20 @@ class LLMClient(Protocol):
     def complete(self, prompt: str) -> str:
         """Free-form completion (used by the optional LLM describer)."""
         ...
+
+
+def _usage_of(message: Any) -> Usage:
+    """Read measured token usage off an Anthropic response."""
+    u = getattr(message, "usage", None)
+    if u is None:
+        return Usage(requests=1)
+    return Usage(
+        input_tokens=getattr(u, "input_tokens", 0) or 0,
+        output_tokens=getattr(u, "output_tokens", 0) or 0,
+        cache_read_tokens=getattr(u, "cache_read_input_tokens", 0) or 0,
+        cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0) or 0,
+        requests=1,
+    )
 
 
 def _to_api_tools(tools: list[Tool]) -> list[dict[str, Any]]:
@@ -81,10 +97,13 @@ class AnthropicClient:
             tool_choice={"type": "any"},
             messages=[{"role": "user", "content": request}],
         )
+        usage = _usage_of(message)
         for block in message.content:
             if getattr(block, "type", None) == "tool_use":
-                return ToolPick(name=block.name, arguments=dict(block.input or {}))
-        return None
+                return ToolPick(
+                    name=block.name, arguments=dict(block.input or {}), usage=usage
+                )
+        return ToolPick(name="", arguments={}, usage=usage) if usage else None
 
     def complete(self, prompt: str) -> str:
         message = self._create(
