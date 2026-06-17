@@ -112,6 +112,26 @@ The eval is deliberately honest. Beyond correct-tool selection it also reports:
   expected arguments, whether the model filled the right parameters
   (e.g. `petId: 42` from "look up pet 42").
 
+## What costs money, what's free
+
+Almost everything is free and offline — only the eval makes LLM calls.
+
+| Command | LLM calls? | Cost |
+|---------|------------|------|
+| `parse` / `curate` / `serve` | No | **Free** — run as often as you like, no API key |
+| `eval` | Yes (~28 per Petstore run: raw **and** curated, all cases) | A few cents **per run** (e.g. ~$0.23 on Petstore with Sonnet) — not a one-time fee |
+| `curate --llm-descriptions` (optional) | Yes (one per tool, once) | A few cents, only when you opt in |
+
+The eval costs money **each time you run it** because it makes real API calls to
+*measure* raw vs curated — including the expensive raw side on purpose. You only
+run it to get a number, not as part of normal use. **The savings happen at
+runtime**, when your AI agent calls the *curated* server you deployed — every
+such call uses ~95% fewer tool-definition tokens than the raw equivalent.
+
+> Tip: don't run `eval` on Stripe/GitHub just to see a big number — 14 raw
+> requests of ~445K tokens each would cost **$18+** and may exceed the context
+> window. The token-reduction table above already proves the large-API case.
+
 > **Forking this repo?** The status badges above point to `tarundattagondi/mcp-curate`.
 > Replace that with `your-username/mcp-curate` in the three badge URLs at the top
 > so they track your own fork's CI.
