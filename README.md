@@ -80,19 +80,29 @@ the correct tool.
 
 ```
 $ export ANTHROPIC_API_KEY=...
-$ mcp-curate eval examples/stripe.json --cases examples/eval_cases/stripe.yaml
+$ mcp-curate eval examples/petstore.json --cases examples/eval_cases/petstore.yaml
 
 Eval: raw vs curated tool selection
-cases: 11   raw tools: 587   curated tools: 40
+cases: 14   raw tools: 19   curated tools: 3
 
-raw     correct-tool selection: <run it>%
-curated correct-tool selection: <run it>%
-  -> improvement: <run it> points
+raw     correct-tool selection:    93%
+curated correct-tool selection:   100%
+  -> improvement: +7 points
+curated tool+action correct:      100%
+
+argument construction (5 cases with expected args):
+  raw     correct args:   100%
+  curated correct args:   100%
 ```
 
-The harness uses **your** key on **your** spec, so the numbers aren't
-hard-coded — run the command above to reproduce them. Golden sets ship for
-Petstore and Stripe (`examples/eval_cases/`); add your own as a small YAML file.
+Petstore is deliberately tiny (19 tools), so even the raw server does well — yet
+curated still reaches **100%**, fixing the one case where the raw model returned
+*no tool at all*. The gap widens sharply as the API grows: tool-selection
+accuracy is known to degrade past ~100 tools, and a raw server with hundreds of
+tools (Stripe's 587, GitHub's 1190) often won't load at all (see the token table
+above). The harness uses **your** key on **your** spec — run it on a bigger spec
+to see the real spread. Golden sets ship for Petstore and Stripe
+(`examples/eval_cases/`); add your own as a small YAML file.
 
 The eval is deliberately honest. Beyond correct-tool selection it also reports:
 
