@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-curate"
-version = "0.1.0"
+version = "0.1.1"
 description = "Turn an OpenAPI spec into a high-quality, curated MCP server — with an eval harness that proves curation works."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -46,6 +46,9 @@ mcp-curate = "mcp_curate.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"mcp_curate.data" = ["*.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

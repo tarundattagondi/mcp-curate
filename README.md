@@ -136,6 +136,13 @@ such call uses ~95% fewer tool-definition tokens than the raw equivalent.
 > Replace that with `your-username/mcp-curate` in the three badge URLs at the top
 > so they track your own fork's CI.
 
+## Quickstart
+
+```bash
+pip install mcp-curate
+mcp-curate demo          # curates a bundled Petstore spec — see 19 -> 3 instantly, no setup
+```
+
 ## Install
 
 ```bash
@@ -155,6 +162,9 @@ pip install -e ".[dev,llm]"
 ## Usage
 
 ```bash
+# Zero-setup demo on the bundled Petstore spec.
+mcp-curate demo
+
 # Inspect a spec's raw tool count.
 mcp-curate parse examples/petstore.json
 
@@ -198,7 +208,7 @@ headers. Use `--allow-local-network` to serve a localhost/private API. See
 ## Development
 
 ```bash
-python -m pytest        # 35 tests: parser, curation, server roundtrip, eval
+python -m pytest        # 44 tests: parser, curation, server roundtrip, eval, demo
 ```
 
 Tests are offline: the parser/curation suites need no network, and the eval

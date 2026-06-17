@@ -27,6 +27,10 @@ def main(argv: list[str] | None = None) -> int:
     p_parse = sub.add_parser("parse", help="parse a spec and report tool counts")
     p_parse.add_argument("spec", help="path to an OpenAPI 3.x JSON/YAML file")
 
+    sub.add_parser(
+        "demo", help="run curation on the bundled Petstore spec (zero setup)"
+    )
+
     p_curate = sub.add_parser(
         "curate", help="show the before/after curation report for a spec"
     )
@@ -104,6 +108,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
+        if args.command == "demo":
+            return _cmd_demo(args)
         if args.command == "parse":
             return _cmd_parse(args)
         if args.command == "curate":
@@ -116,6 +122,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     return 1
+
+
+def _cmd_demo(args: argparse.Namespace) -> int:
+    """Curate the bundled Petstore spec — a zero-setup first run."""
+    from importlib.resources import as_file, files
+
+    resource = files("mcp_curate.data").joinpath("petstore.json")
+    with as_file(resource) as path:
+        spec = load_spec(path)
+        result = curate(spec)
+    print(f"Demo spec: {spec.title} v{spec.version}\n")
+    print(result.report.render())
+    print(
+        "\nThis is the bundled Petstore demo. Point mcp-curate at your own spec:\n"
+        "  mcp-curate curate path/to/your-openapi.json\n"
+        "  mcp-curate serve  path/to/your-openapi.json --curated"
+    )
+    return 0
 
 
 def _cmd_parse(args: argparse.Namespace) -> int:
