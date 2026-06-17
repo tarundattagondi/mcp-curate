@@ -214,16 +214,21 @@ with no API key required).
 ## Security
 
 Runs fully local; nothing leaves your machine except LLM calls (eval, with your
-key) and the API calls your served spec makes. An **SSRF guard is on by default**
-— tool calls to loopback/private/link-local hosts are blocked (the cloud-metadata
-address `169.254.169.254` always), so a malicious spec can't exfiltrate your auth
-headers. Use `--allow-local-network` to serve a localhost/private API. See
-[SECURITY.md](SECURITY.md).
+key) and the API calls your served spec makes. Defenses on by default:
+
+- **SSRF guard** — tool calls to loopback/private/link-local hosts are blocked
+  (cloud-metadata `169.254.169.254` always); `--allow-local-network` to opt in.
+- **Tool-poisoning defense** — descriptions are scrubbed of hidden unicode and
+  scanned for prompt-injection ("ignore previous instructions", `<system>` tags,
+  secret-exfil), warning you which tools look suspicious.
+- **No redirects, TLS verified, 64 MB spec cap, no secrets in the package.**
+
+Only serve specs you trust. See [SECURITY.md](SECURITY.md).
 
 ## Development
 
 ```bash
-python -m pytest        # 47 tests: parser, curation, server roundtrip, eval, demo, export
+python -m pytest        # 54 tests: parser, curation, server, eval, demo, export, security
 ```
 
 Tests are offline: the parser/curation suites need no network, and the eval

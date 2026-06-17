@@ -8,6 +8,7 @@ flattens each operation into an :class:`Endpoint`.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,10 @@ from .model import Endpoint, Parameter, Spec
 
 _HTTP_METHODS = {"get", "put", "post", "delete", "patch", "options", "head", "trace"}
 _MAX_REF_DEPTH = 50
+# Bound the spec size so a hostile multi-gigabyte file can't exhaust memory.
+# Real specs are small (GitHub's ~12 MB is the largest public one); 64 MB is
+# generous headroom. Override with MCP_CURATE_MAX_SPEC_MB.
+_MAX_SPEC_BYTES = int(os.environ.get("MCP_CURATE_MAX_SPEC_MB", "64")) * 1024 * 1024
 
 
 class SpecError(ValueError):
@@ -29,6 +34,14 @@ def load_spec(path: str | Path) -> Spec:
     path = Path(path)
     if not path.exists():
         raise SpecError(f"spec file not found: {path}")
+
+    size = path.stat().st_size
+    if size > _MAX_SPEC_BYTES:
+        raise SpecError(
+            f"spec is {size // (1024 * 1024)} MB, over the "
+            f"{_MAX_SPEC_BYTES // (1024 * 1024)} MB limit "
+            "(set MCP_CURATE_MAX_SPEC_MB to raise it)"
+        )
 
     raw = path.read_text(encoding="utf-8")
     doc = _parse_text(raw, path)

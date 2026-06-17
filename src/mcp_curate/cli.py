@@ -258,16 +258,38 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
     if args.base_url is not None:
         base_url = args.base_url
+
+    # Scrub hidden characters and flag prompt-injection in every served tool set
+    # (covers raw, curated, and hand-edited prebuilt export files alike).
+    from .curation.sanitize import sanitize_tools
+    from urllib.parse import urlparse
+
+    findings = sanitize_tools(tools)
+    headers = _parse_headers(args.header)
+
+    print(
+        f"serving {len(tools)} {kind} tools from {title} over stdio",
+        file=sys.stderr,
+    )
+    if headers:
+        host = urlparse(base_url).hostname or "(no host)"
+        print(
+            f"  auth headers will be sent to: {host} — verify you trust this host",
+            file=sys.stderr,
+        )
+    for finding in findings:
+        print(
+            f"  ⚠ possible prompt-injection in tool '{finding.tool}': "
+            f"{', '.join(finding.reasons)}",
+            file=sys.stderr,
+        )
+
     server = ToolServer(
         name=title,
         tools=tools,
         base_url=base_url,
-        headers=_parse_headers(args.header),
+        headers=headers,
         allow_local=args.allow_local_network,
-    )
-    print(
-        f"serving {len(tools)} {kind} tools from {title} over stdio",
-        file=sys.stderr,
     )
     asyncio.run(server.run())
     return 0

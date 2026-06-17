@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .budget import Merge
+from .sanitize import Finding
 
 
 @dataclass
@@ -21,6 +22,7 @@ class CurationReport:
     tools: list[ToolSummary] = field(default_factory=list)
     merges: list[Merge] = field(default_factory=list)
     max_tools: int = 0
+    security_findings: list[Finding] = field(default_factory=list)
 
     @property
     def reduction_pct(self) -> float:
@@ -48,4 +50,9 @@ class CurationReport:
                 lines.append(
                     f"  - {' + '.join(merge.source_keys)} -> {merge.result_key}"
                 )
+        if self.security_findings:
+            lines += ["", "⚠ Possible prompt-injection in tool descriptions:"]
+            for finding in self.security_findings:
+                lines.append(f"  - {finding.tool}: {', '.join(finding.reasons)}")
+            lines.append("  Review these — only serve specs you trust.")
         return "\n".join(lines)

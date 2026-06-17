@@ -36,6 +36,17 @@ mcp-curate mitigates this:
 - **Path-parameter encoding.** Values substituted into URL paths are
   percent-encoded, preventing path/segment injection.
 - **Request timeouts** are set on every call.
+- **Tool-poisoning defense (on by default).** A malicious spec can hide
+  instructions aimed at your AI agent inside an operation `description` — hidden
+  zero-width/bidi characters, fake `<system>` tags, "ignore previous
+  instructions…", "send the `.env`…". On every `curate`/`serve`/`eval`,
+  mcp-curate **scrubs** invisible/control characters from descriptions and
+  **flags** descriptions matching injection heuristics, warning you which tools
+  look suspicious. See `curation/sanitize.py`.
+- **Spec size cap.** Specs larger than 64 MB are rejected to bound memory use on
+  a hostile file (override with `MCP_CURATE_MAX_SPEC_MB`).
+- **Auth destination is shown.** When you serve with auth headers, mcp-curate
+  prints the host those headers will be sent to, so you can verify it.
 
 ### Serving a localhost or private API
 

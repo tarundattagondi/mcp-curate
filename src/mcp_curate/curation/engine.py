@@ -10,6 +10,7 @@ from .budget import enforce_budget
 from .describer import Describer, DeterministicDescriber, render_description
 from .grouper import group_endpoints, split_to_budget
 from .report import CurationReport, ToolSummary
+from .sanitize import sanitize_tools
 
 DEFAULT_MAX_TOOLS = 40
 DEFAULT_MAX_ACTIONS = 30
@@ -62,12 +63,16 @@ def curate(
             )
         )
 
+    # Scrub hidden characters from descriptions and flag injection attempts.
+    findings = sanitize_tools(curated)
+
     report = CurationReport(
         raw_count=len(raw_tools),
         curated_count=len(curated),
         tools=summaries,
         merges=merges,
         max_tools=max_tools,
+        security_findings=findings,
     )
     return CurationResult(raw_tools=raw_tools, curated_tools=curated, report=report)
 

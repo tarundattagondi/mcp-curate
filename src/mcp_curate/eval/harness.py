@@ -102,7 +102,10 @@ def run_eval(
     max_actions: int = 30,
     describer: Describer | None = None,
 ) -> EvalReport:
+    from ..curation.sanitize import sanitize_tools
+
     raw_tools = build_raw_tools(spec)
+    sanitize_tools(raw_tools)  # curated tools are already scrubbed by curate()
     curated_tools = curate(
         spec, max_tools=max_tools, max_actions=max_actions, describer=describer
     ).curated_tools
