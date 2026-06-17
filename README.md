@@ -52,6 +52,26 @@ At a tight budget (the default 40), curation keeps tags whole and clean rather
 than forcing unrelated tags together; raise `--max-tools` to trade tool count
 for smaller, more focused tools.
 
+## Why this saves money, latency, and context
+
+Tool definitions (names + descriptions + schemas) are sent to the model as
+**input tokens on every request**. Fewer tools means fewer tokens every call —
+so it's cheaper, faster, and actually fits in the context window.
+
+| Spec | Raw tool-defs | Curated | Reduction |
+|------|--------------:|--------:|----------:|
+| Stripe | ~444,900 tokens | ~24,300 tokens | **95%** |
+| GitHub | ~318,400 tokens | ~49,500 tokens | **84%** |
+
+At Sonnet input pricing ($3 / 1M tokens), the Stripe tool definitions alone cost
+**~$1.33 per request raw vs ~$0.07 curated** — about **$1,260 saved per 1,000
+requests**, before the model even answers. (Prompt caching narrows the gap to
+~18× on cache hits; output tokens are unchanged.)
+
+For a large API the bigger win is feasibility, not cost: Stripe's raw 445K
+tokens of tool definitions exceed most context windows, so the raw server
+**won't load at all** — curated, it fits.
+
 ## Does curation actually help? (the eval)
 
 `mcp-curate eval` runs natural-language requests against both the raw and the
