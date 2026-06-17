@@ -140,24 +140,29 @@ def _cmd_curate(args: argparse.Namespace) -> int:
 
 def _cmd_eval(args: argparse.Namespace) -> int:
     from .eval.harness import load_cases, run_eval
-    from .eval.llm import DEFAULT_MODEL, AnthropicClient
+    from .eval.llm import DEFAULT_MODEL, AnthropicClient, LLMError
 
     spec = load_spec(args.spec)
     cases = load_cases(args.cases)
     try:
         client = AnthropicClient(model=args.model or DEFAULT_MODEL)
+        describer = (
+            LLMDescriber(client) if args.llm_descriptions else DeterministicDescriber()
+        )
+        report = run_eval(
+            spec,
+            cases,
+            client,
+            max_tools=args.max_tools,
+            max_actions=args.max_actions,
+            describer=describer,
+        )
+    except LLMError as exc:
+        print(f"error: LLM request failed: {exc}", file=sys.stderr)
+        return 2
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    describer = LLMDescriber(client) if args.llm_descriptions else DeterministicDescriber()
-    report = run_eval(
-        spec,
-        cases,
-        client,
-        max_tools=args.max_tools,
-        max_actions=args.max_actions,
-        describer=describer,
-    )
     print(report.render())
     return 0
 

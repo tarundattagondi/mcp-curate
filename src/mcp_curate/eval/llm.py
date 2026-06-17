@@ -16,6 +16,10 @@ from ..server.builder import Tool
 DEFAULT_MODEL = "claude-sonnet-4-6"
 
 
+class LLMError(RuntimeError):
+    """A user-facing LLM/API failure (billing, auth, rate limit, ...)."""
+
+
 @dataclass
 class ToolPick:
     """Which tool the model chose for a request, and with what arguments."""
@@ -58,12 +62,20 @@ class AnthropicClient:
         key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not key:
             raise RuntimeError("set ANTHROPIC_API_KEY to run the eval harness")
+        self._anthropic = anthropic
         self._client = anthropic.Anthropic(api_key=key)
         self._model = model
 
+    def _create(self, **kwargs):
+        """Call the Messages API, surfacing API failures as clean LLMErrors."""
+        try:
+            return self._client.messages.create(model=self._model, **kwargs)
+        except self._anthropic.APIError as exc:
+            message = getattr(exc, "message", None) or str(exc)
+            raise LLMError(message) from exc
+
     def select(self, request: str, tools: list[Tool]) -> ToolPick | None:
-        message = self._client.messages.create(
-            model=self._model,
+        message = self._create(
             max_tokens=1024,
             tools=_to_api_tools(tools),
             tool_choice={"type": "any"},
@@ -75,8 +87,7 @@ class AnthropicClient:
         return None
 
     def complete(self, prompt: str) -> str:
-        message = self._client.messages.create(
-            model=self._model,
+        message = self._create(
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
         )
