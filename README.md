@@ -120,7 +120,7 @@ Almost everything is free and offline — only the eval makes LLM calls.
 |---------|------------|------|
 | `parse` / `curate` / `serve` | No | **Free** — run as often as you like, no API key |
 | `eval` | Yes (~28 per Petstore run: raw **and** curated, all cases) | A few cents **per run** (e.g. ~$0.23 on Petstore with Sonnet) — not a one-time fee |
-| `curate --llm-descriptions` (optional) | Yes (one per tool, once) | A few cents, only when you opt in |
+| `curate --llm-descriptions` (optional) | Yes (one per tool) | A few cents — and with `--export` it's truly **one-time**: pay once, then `serve` the prebuilt file free forever |
 
 The eval costs money **each time you run it** because it makes real API calls to
 *measure* raw vs curated — including the expensive raw side on purpose. You only
@@ -179,6 +179,21 @@ mcp-curate serve examples/petstore.json --curated \
 mcp-curate eval examples/petstore.json --cases examples/eval_cases/petstore.yaml
 ```
 
+### Bake the curation once, serve it free forever
+
+`serve --curated` re-curates on every launch — instant and free for the default
+deterministic curation. But if you use `--llm-descriptions` (which calls the LLM),
+you don't want to pay on every restart. Export the curated tool set once, then
+serve the prebuilt file with no further curation or API calls:
+
+```bash
+# Pay the LLM once, write a reusable file:
+mcp-curate curate api.json --llm-descriptions --export curated.json
+
+# Serve it forever, free — no re-curation, no LLM:
+mcp-curate serve curated.json --header "Authorization: Bearer $TOKEN"
+```
+
 Add `--llm-descriptions` to `curate`/`serve`/`eval` to let the LLM polish the
 curated tool names and descriptions (otherwise they're generated deterministically,
 with no API key required).
@@ -208,7 +223,7 @@ headers. Use `--allow-local-network` to serve a localhost/private API. See
 ## Development
 
 ```bash
-python -m pytest        # 44 tests: parser, curation, server roundtrip, eval, demo
+python -m pytest        # 47 tests: parser, curation, server roundtrip, eval, demo, export
 ```
 
 Tests are offline: the parser/curation suites need no network, and the eval

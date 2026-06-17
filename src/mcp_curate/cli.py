@@ -47,6 +47,17 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_MAX_ACTIONS,
         help=f"split tools larger than this many actions (default {DEFAULT_MAX_ACTIONS})",
     )
+    p_curate.add_argument(
+        "--llm-descriptions",
+        action="store_true",
+        help="polish tool names/descriptions with the LLM (needs ANTHROPIC_API_KEY)",
+    )
+    p_curate.add_argument(
+        "--export",
+        default=None,
+        metavar="FILE",
+        help="write the curated tool set to a reusable file for `serve` (no re-curation)",
+    )
 
     p_eval = sub.add_parser(
         "eval", help="A/B raw vs curated tool selection with your LLM key"
@@ -156,9 +167,32 @@ def _cmd_parse(args: argparse.Namespace) -> int:
 
 
 def _cmd_curate(args: argparse.Namespace) -> int:
+    from .eval.llm import LLMError
+
     spec = load_spec(args.spec)
-    result = curate(spec, max_tools=args.max_tools, max_actions=args.max_actions)
+    try:
+        describer = _build_describer(args)
+        result = curate(
+            spec,
+            max_tools=args.max_tools,
+            max_actions=args.max_actions,
+            describer=describer,
+        )
+    except LLMError as exc:
+        print(f"error: LLM request failed: {exc}", file=sys.stderr)
+        return 2
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     print(result.report.render())
+    if args.export:
+        from .curation.export import export_tools
+
+        export_tools(args.export, spec.title, spec.base_url, result.curated_tools)
+        print(
+            f"\nexported {len(result.curated_tools)} curated tools to {args.export}\n"
+            f"serve it for free (no re-curation):  mcp-curate serve {args.export}"
+        )
     return 0
 
 
@@ -200,29 +234,39 @@ def _build_describer(args: argparse.Namespace):
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
-    spec = load_spec(args.spec)
-    if args.curated:
-        describer = _build_describer(args)
-        tools = curate(
-            spec,
-            max_tools=args.max_tools,
-            max_actions=args.max_actions,
-            describer=describer,
-        ).curated_tools
-        kind = "curated"
+    from .curation.export import is_export_file, load_export
+
+    if is_export_file(args.spec):
+        # Prebuilt curated tool set — serve it directly, no re-curation.
+        title, base_url, tools = load_export(args.spec)
+        kind = "curated (prebuilt)"
     else:
-        tools = build_raw_tools(spec)
-        kind = "raw"
-    base_url = args.base_url if args.base_url is not None else spec.base_url
+        spec = load_spec(args.spec)
+        title, base_url = spec.title, spec.base_url
+        if args.curated:
+            describer = _build_describer(args)
+            tools = curate(
+                spec,
+                max_tools=args.max_tools,
+                max_actions=args.max_actions,
+                describer=describer,
+            ).curated_tools
+            kind = "curated"
+        else:
+            tools = build_raw_tools(spec)
+            kind = "raw"
+
+    if args.base_url is not None:
+        base_url = args.base_url
     server = ToolServer(
-        name=spec.title,
+        name=title,
         tools=tools,
         base_url=base_url,
         headers=_parse_headers(args.header),
         allow_local=args.allow_local_network,
     )
     print(
-        f"serving {len(tools)} {kind} tools from {spec.title} over stdio",
+        f"serving {len(tools)} {kind} tools from {title} over stdio",
         file=sys.stderr,
     )
     asyncio.run(server.run())
