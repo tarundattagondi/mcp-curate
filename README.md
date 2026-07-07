@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/tarundattagondi-mcp-curate-badge.png)](https://mseep.ai/app/tarundattagondi-mcp-curate)
+
 # mcp-curate
 
 [![PyPI](https://img.shields.io/pypi/v/mcp-curate)](https://pypi.org/project/mcp-curate/)
